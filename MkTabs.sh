@@ -5,7 +5,7 @@
 #
 #################################################################
 CHROOT="${CHROOT:-/mnt/ec2-root}"
-TARGSWAP=${2:-/dev/VolGroup00/swapVol}
+#TARGSWAP=${2:-/dev/VolGroup00/swapVol}
 FSTAB="${CHROOT}/etc/fstab"
 
 # Check for arguments
@@ -64,7 +64,7 @@ do
    esac
    printf "%s\t%s\t%s\tdefaults\t0 0\n" "${BLKDEV}" "${MNTPNT}" "${FSTYPE}"
 done >> "${FSTAB}"
-printf "%s\t%s\t%s\t%s\t0 0\n" "${TARGSWAP}" swap swap '-' >> "${FSTAB}"
+#printf "%s\t%s\t%s\t%s\t0 0\n" "${TARGSWAP}" swap swap '-' >> "${FSTAB}"
 
 
 # Read mtab matches into an array

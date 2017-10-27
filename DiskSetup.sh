@@ -6,6 +6,7 @@
 #################################################################
 PROGNAME=$(basename "$0")
 BOOTDEVSZ="500m"
+FSTYPE="xfs"
 
 # Error-logging
 function err_exit {
@@ -36,18 +37,18 @@ function LogBrk() {
 # Partition as LVM
 function CarveLVM() {
    local ROOTVOL=(rootVol 4g)
-   local SWAPVOL=(swapVol 2g)
+   #local SWAPVOL=(swapVol 2g)
    local HOMEVOL=(homeVol 1g)
    local VARVOL=(varVol 2g)
-   local LOGVOL=(logVol 2g)
+   local LOGVOL=(logVol 1g)
    local AUDVOL=(auditVol 100%FREE)
 
    # Clear the MBR and partition table
    dd if=/dev/zero of="${CHROOTDEV}" bs=512 count=1000 > /dev/null 2>&1
 
    # Lay down the base partitions
-   parted -s "${CHROOTDEV}" -- mklabel msdos mkpart primary ext4 2048s ${BOOTDEVSZ} \
-      mkpart primary ext4 ${BOOTDEVSZ} 100% set 2 lvm
+   parted -s "${CHROOTDEV}" -- mklabel msdos mkpart primary ${FSTYPE} 2048s ${BOOTDEVSZ} \
+      mkpart primary ${FSTYPE} ${BOOTDEVSZ} 100% set 2 lvm
 
    # Stop/umount boot device, in case parted/udev/systemd managed to remount it
   systemctl stop boot.mount
@@ -55,7 +56,7 @@ function CarveLVM() {
    # Create LVM objects
    vgcreate -y "${VGNAME}" "${CHROOTDEV}2" || LogBrk 5 "VG creation failed. Aborting!"
    lvcreate --yes -W y -L "${ROOTVOL[1]}" -n "${ROOTVOL[0]}" "${VGNAME}" || LVCSTAT=1
-   lvcreate --yes -W y -L "${SWAPVOL[1]}" -n "${SWAPVOL[0]}" "${VGNAME}" || LVCSTAT=1
+   #lvcreate --yes -W y -L "${SWAPVOL[1]}" -n "${SWAPVOL[0]}" "${VGNAME}" || LVCSTAT=1
    lvcreate --yes -W y -L "${HOMEVOL[1]}" -n "${HOMEVOL[0]}" "${VGNAME}" || LVCSTAT=1
    lvcreate --yes -W y -L "${VARVOL[1]}" -n "${VARVOL[0]}" "${VGNAME}" || LVCSTAT=1
    lvcreate --yes -W y -L "${LOGVOL[1]}" -n "${LOGVOL[0]}" "${VGNAME}" || LVCSTAT=1
@@ -81,13 +82,13 @@ function CarveLVM() {
   systemctl stop boot.mount
 
    # Create filesystems
-   mkfs -t ext4 -L "${BOOTLABEL}" "${CHROOTDEV}1" || err_exit "Failure creating filesystem - /boot"
-   mkfs -t ext4 "/dev/${VGNAME}/${ROOTVOL[0]}" || err_exit "Failure creating filesystem - /"
-   mkfs -t ext4 "/dev/${VGNAME}/${HOMEVOL[0]}" || err_exit "Failure creating filesystem - /home"
-   mkfs -t ext4 "/dev/${VGNAME}/${VARVOL[0]}" || err_exit "Failure creating filesystem - /var"
-   mkfs -t ext4 "/dev/${VGNAME}/${LOGVOL[0]}" || err_exit "Failure creating filesystem - /var/log"
-   mkfs -t ext4 "/dev/${VGNAME}/${AUDVOL[0]}" || err_exit "Failure creating filesystem - /var/log/audit"
-   mkswap "/dev/${VGNAME}/${SWAPVOL[0]}"
+   mkfs -t ${FSTYPE} -L "${BOOTLABEL}" "${CHROOTDEV}1" || err_exit "Failure creating filesystem - /boot"
+   mkfs -t ${FSTYPE} "/dev/${VGNAME}/${ROOTVOL[0]}" || err_exit "Failure creating filesystem - /"
+   mkfs -t ${FSTYPE} "/dev/${VGNAME}/${HOMEVOL[0]}" || err_exit "Failure creating filesystem - /home"
+   mkfs -t ${FSTYPE} "/dev/${VGNAME}/${VARVOL[0]}" || err_exit "Failure creating filesystem - /var"
+   mkfs -t ${FSTYPE} "/dev/${VGNAME}/${LOGVOL[0]}" || err_exit "Failure creating filesystem - /var/log"
+   mkfs -t ${FSTYPE} "/dev/${VGNAME}/${AUDVOL[0]}" || err_exit "Failure creating filesystem - /var/log/audit"
+   #mkswap "/dev/${VGNAME}/${SWAPVOL[0]}"
 
    # shellcheck disable=SC2053
    if [[ $(e2label "${CHROOTDEV}1") != ${BOOTLABEL} ]]
@@ -103,12 +104,12 @@ function CarveBare() {
    dd if=/dev/zero of="${CHROOTDEV}" bs=512 count=1000 > /dev/null 2>&1
 
    # Lay down the base partitions
-   parted -s "${CHROOTDEV}" -- mklabel msdos mkpart primary ext4 2048s "${BOOTDEVSZ}" \
-      mkpart primary ext4 ${BOOTDEVSZ} 100%
+   parted -s "${CHROOTDEV}" -- mklabel msdos mkpart primary ${FSTYPE} 2048s "${BOOTDEVSZ}" \
+      mkpart primary ${FSTYPE} ${BOOTDEVSZ} 100%
 
    # Create FS on partitions
-   mkfs -t ext4 -L "${BOOTLABEL}" "${CHROOTDEV}1"
-   mkfs -t ext4 -L "${ROOTLABEL}" "${CHROOTDEV}2"
+   mkfs -t ${FSTYPE} -L "${BOOTLABEL}" "${CHROOTDEV}1"
+   mkfs -t ${FSTYPE} -L "${ROOTLABEL}" "${CHROOTDEV}2"
 }
 
 
