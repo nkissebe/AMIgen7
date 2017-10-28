@@ -91,11 +91,11 @@ function CarveLVM() {
    #mkswap "/dev/${VGNAME}/${SWAPVOL[0]}"
 
    # shellcheck disable=SC2053
-   if [[ $(e2label "${CHROOTDEV}1") != ${BOOTLABEL} ]]
-   then
-      e2label "${CHROOTDEV}1" "${BOOTLABEL}" || \
-         err_exit "Failed to apply desired label to ${CHROOTDEV}1"
-   fi
+   #if [[ $(e2label "${CHROOTDEV}1") != ${BOOTLABEL} ]]
+   #then
+   #   e2label "${CHROOTDEV}1" "${BOOTLABEL}" || \
+   #      err_exit "Failed to apply desired label to ${CHROOTDEV}1"
+   #fi
 }
 
 # Partition with no LVM
