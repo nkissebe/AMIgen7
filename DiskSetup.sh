@@ -1,5 +1,4 @@
-#!/bin/sh
-# shellcheck disable=SC2181
+#!/bin/bash
 #
 # Script to automate basic setup of CHROOT device
 #
@@ -37,7 +36,7 @@ function LogBrk() {
 # Partition as LVM
 function CarveLVM() {
    local ROOTVOL=(rootVol 4g)
-   #local SWAPVOL=(swapVol 2g)
+   local SWAPVOL=(swapVol 2g)
    local HOMEVOL=(homeVol 1g)
    local VARVOL=(varVol 2g)
    local LOGVOL=(logVol 1g)
@@ -51,12 +50,14 @@ function CarveLVM() {
       mkpart primary ${FSTYPE} ${BOOTDEVSZ} 100% set 2 lvm
 
    # Stop/umount boot device, in case parted/udev/systemd managed to remount it
-  systemctl stop boot.mount
+   systemctl stop boot.mount
 
    # Create LVM objects
    vgcreate -y "${VGNAME}" "${CHROOTDEV}2" || LogBrk 5 "VG creation failed. Aborting!"
    lvcreate --yes -W y -L "${ROOTVOL[1]}" -n "${ROOTVOL[0]}" "${VGNAME}" || LVCSTAT=1
-   #lvcreate --yes -W y -L "${SWAPVOL[1]}" -n "${SWAPVOL[0]}" "${VGNAME}" || LVCSTAT=1
+   if [[ "${SWAPON}" = 1 ]]; then
+     lvcreate --yes -W y -L "${SWAPVOL[1]}" -n "${SWAPVOL[0]}" "${VGNAME}" || LVCSTAT=1
+   fi
    lvcreate --yes -W y -L "${HOMEVOL[1]}" -n "${HOMEVOL[0]}" "${VGNAME}" || LVCSTAT=1
    lvcreate --yes -W y -L "${VARVOL[1]}" -n "${VARVOL[0]}" "${VGNAME}" || LVCSTAT=1
    lvcreate --yes -W y -L "${LOGVOL[1]}" -n "${LOGVOL[0]}" "${VGNAME}" || LVCSTAT=1
@@ -70,7 +71,6 @@ function CarveLVM() {
 
    # Gather info to diagnose seeming /boot race condition
    grep "${BOOTLABEL}" /proc/mounts
-   # shellcheck disable=SC2181
    if [[ $? -eq 0 ]]
    then
      tail -n 100 /var/log/messages
@@ -79,7 +79,7 @@ function CarveLVM() {
 
    # Stop/umount boot device, in case parted/udev/systemd managed to remount it
    # again.
-  systemctl stop boot.mount
+   systemctl stop boot.mount
 
    # Create filesystems
    mkfs -t ${FSTYPE} -L "${BOOTLABEL}" "${CHROOTDEV}1" || err_exit "Failure creating filesystem - /boot"
@@ -88,14 +88,14 @@ function CarveLVM() {
    mkfs -t ${FSTYPE} "/dev/${VGNAME}/${VARVOL[0]}" || err_exit "Failure creating filesystem - /var"
    mkfs -t ${FSTYPE} "/dev/${VGNAME}/${LOGVOL[0]}" || err_exit "Failure creating filesystem - /var/log"
    mkfs -t ${FSTYPE} "/dev/${VGNAME}/${AUDVOL[0]}" || err_exit "Failure creating filesystem - /var/log/audit"
-   #mkswap "/dev/${VGNAME}/${SWAPVOL[0]}"
-
-   # shellcheck disable=SC2053
-   #if [[ $(e2label "${CHROOTDEV}1") != ${BOOTLABEL} ]]
-   #then
-   #   e2label "${CHROOTDEV}1" "${BOOTLABEL}" || \
-   #      err_exit "Failed to apply desired label to ${CHROOTDEV}1"
-   #fi
+   if [[ "${SWAPON}" = 1 ]]; then
+      mkswap "/dev/${VGNAME}/${SWAPVOL[0]}"
+   fi
+   if [[ $(e2label "${CHROOTDEV}1") != ${BOOTLABEL} ]]
+   then
+      e2label "${CHROOTDEV}1" "${BOOTLABEL}" || \
+         err_exit "Failed to apply desired label to ${CHROOTDEV}1"
+   fi
 }
 
 # Partition with no LVM
@@ -127,6 +127,15 @@ eval set -- "${OPTIONBUFR}"
 while true
 do
    case "$1" in
+      -s|--swapon)
+            case "$2" in
+               *)
+               SWAPON=1
+                  shift 2;
+               ;;
+            esac
+            ;;
+               
       -b|--bootlabel)
 	    case "$2" in
 	       "")
